@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTRPC } from "@/trpc/client";
 
@@ -14,10 +15,27 @@ const formatarData = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
 });
 
-export function ListaTarefas() {
+const MENSAGENS_SALVO = {
+  criada: "Tarefa criada com sucesso.",
+  atualizada: "Tarefa atualizada com sucesso.",
+} as const;
+
+type Props = {
+  /** Vem de `?salvo=` quando o usuário acaba de criar/editar uma tarefa. */
+  salvo?: keyof typeof MENSAGENS_SALVO;
+};
+
+export function ListaTarefas({ salvo }: Props) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(
+    salvo ? { tipo: "sucesso", texto: MENSAGENS_SALVO[salvo] } : null,
+  );
+
+  // Remove `?salvo=` da URL para a mensagem não reaparecer ao recarregar a página.
+  useEffect(() => {
+    if (salvo) window.history.replaceState(null, "", "/");
+  }, [salvo]);
 
   // Os dados já chegam hidratados do SSR (ver `page.tsx`), então não há loading inicial.
   const tarefas = useQuery(trpc.tarefas.listar.queryOptions());
@@ -50,6 +68,13 @@ export function ListaTarefas() {
 
   return (
     <section className="space-y-4">
+      <Link
+        href="/tarefas/nova"
+        className="inline-block rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+      >
+        Nova tarefa
+      </Link>
+
       {feedback && (
         <div
           role={feedback.tipo === "erro" ? "alert" : "status"}
@@ -95,13 +120,21 @@ export function ListaTarefas() {
                   Criada em {formatarData.format(tarefa.dataCriacao)}
                 </p>
               </div>
-              <button
-                onClick={() => aoExcluir(tarefa.id, tarefa.titulo)}
-                disabled={excluindo}
-                className="shrink-0 rounded border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed"
-              >
-                {excluindo ? "Excluindo..." : "Excluir"}
-              </button>
+              <div className="flex shrink-0 gap-2">
+                <Link
+                  href={`/tarefas/${tarefa.id}/editar`}
+                  className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+                >
+                  Editar
+                </Link>
+                <button
+                  onClick={() => aoExcluir(tarefa.id, tarefa.titulo)}
+                  disabled={excluindo}
+                  className="rounded border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed"
+                >
+                  {excluindo ? "Excluindo..." : "Excluir"}
+                </button>
+              </div>
             </li>
           );
         })}

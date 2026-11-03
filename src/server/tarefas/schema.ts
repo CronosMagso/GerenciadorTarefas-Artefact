@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DESCRICAO_MAX, TITULO_MAX } from "./limites";
 
 /**
  * Entidade Tarefa. Os nomes dos campos seguem o enunciado (pt-BR).
@@ -10,9 +11,6 @@ export type Tarefa = {
   descricao?: string;
   dataCriacao: Date;
 };
-
-const TITULO_MAX = 100;
-const DESCRICAO_MAX = 500;
 
 // Campos editáveis, compartilhados entre criação e atualização.
 // `trim()` roda antes do `min(1)`, então um título só com espaços também é recusado.

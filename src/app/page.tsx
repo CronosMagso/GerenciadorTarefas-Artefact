@@ -6,7 +6,13 @@ import { getQueryClient, HydrateClient, trpc } from "@/trpc/server";
 // pré-renderizá-la no build (SSG) e a lista ficaria congelada.
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ salvo?: string }>;
+}) {
+  const { salvo } = await searchParams;
+
   // Busca no servidor e coloca no cache do React Query; `HydrateClient` envia
   // esse cache ao navegador, e a lista já nasce no HTML, sem spinner inicial.
   await getQueryClient().prefetchQuery(trpc.tarefas.listar.queryOptions());
@@ -15,7 +21,9 @@ export default async function Home() {
     <main className="mx-auto max-w-2xl p-6">
       <h1 className="mb-6 text-2xl font-bold">Tarefas</h1>
       <HydrateClient>
-        <ListaTarefas />
+        <ListaTarefas
+          salvo={salvo === "criada" || salvo === "atualizada" ? salvo : undefined}
+        />
       </HydrateClient>
     </main>
   );
