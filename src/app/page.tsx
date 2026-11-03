@@ -1,15 +1,22 @@
-import { getQueryClient, trpc } from "@/trpc/server";
+import { ListaTarefas } from "@/components/lista-tarefas";
+import { getQueryClient, HydrateClient, trpc } from "@/trpc/server";
 
-// Página provisória: valida a ligação Next + tRPC. Será substituída pela listagem.
+// As tarefas vivem em memória e mudam a cada requisição: a página precisa ser
+// renderizada no servidor a cada acesso (SSR). Sem isso o Next poderia
+// pré-renderizá-la no build (SSG) e a lista ficaria congelada.
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
-  const ping = await getQueryClient().fetchQuery(trpc.ping.queryOptions());
+  // Busca no servidor e coloca no cache do React Query; `HydrateClient` envia
+  // esse cache ao navegador, e a lista já nasce no HTML, sem spinner inicial.
+  await getQueryClient().prefetchQuery(trpc.tarefas.listar.queryOptions());
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-bold">Gerenciador de Tarefas</h1>
-      <p className="mt-2 text-sm">
-        tRPC: {ping.message} ({ping.timestamp.toISOString()})
-      </p>
+    <main className="mx-auto max-w-2xl p-6">
+      <h1 className="mb-6 text-2xl font-bold">Tarefas</h1>
+      <HydrateClient>
+        <ListaTarefas />
+      </HydrateClient>
     </main>
   );
 }
