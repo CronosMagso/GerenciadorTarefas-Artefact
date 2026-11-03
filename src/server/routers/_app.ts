@@ -1,10 +1,11 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
+import { tarefasRouter } from "./tarefas";
 
 /**
- * Router raiz. Os routers de domínio (ex.: tarefas) serão adicionados aqui
- * nas próximas etapas. `ping` existe apenas para validar a integração.
+ * Router raiz. `ping` existe apenas para validar a integração.
  */
 export const appRouter = createTRPCRouter({
+  tarefas: tarefasRouter,
   ping: publicProcedure.query(() => ({
     message: "pong",
     timestamp: new Date(),
