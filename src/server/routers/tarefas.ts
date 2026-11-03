@@ -3,6 +3,7 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import {
   atualizarTarefaInput,
   criarTarefaInput,
+  listarTarefasInput,
   tarefaIdInput,
 } from "../tarefas/schema";
 import { tarefasStore } from "../tarefas/store";
@@ -15,7 +16,13 @@ const tarefaNaoEncontrada = (id: string) =>
   });
 
 export const tarefasRouter = createTRPCRouter({
-  listar: publicProcedure.query(() => tarefasStore.listar()),
+  // Paginada por cursor: o cliente pede `limit` itens e, para a página seguinte,
+  // devolve o `proximoCursor` recebido (formato esperado por useInfiniteQuery).
+  listar: publicProcedure
+    .input(listarTarefasInput)
+    .query(({ input }) =>
+      tarefasStore.listarPagina(input.limit, input.cursor ?? undefined),
+    ),
 
   // Usada pela tela de edição para carregar os dados atuais.
   buscarPorId: publicProcedure.input(tarefaIdInput).query(({ input }) => {

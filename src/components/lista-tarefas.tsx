@@ -1,8 +1,9 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { TAMANHO_PAGINA } from "@/server/tarefas/limites";
 import { useTRPC } from "@/trpc/client";
 
 type Feedback = { tipo: "sucesso" | "erro"; texto: string };
@@ -37,8 +38,34 @@ export function ListaTarefas({ salvo }: Props) {
     if (salvo) window.history.replaceState(null, "", "/");
   }, [salvo]);
 
-  // Os dados já chegam hidratados do SSR (ver `page.tsx`), então não há loading inicial.
-  const tarefas = useQuery(trpc.tarefas.listar.queryOptions());
+  // A primeira página já chega hidratada do SSR (ver `page.tsx`), então não há
+  // loading inicial. As próximas são pedidas pelo infinite scroll abaixo.
+  const consulta = useInfiniteQuery(
+    trpc.tarefas.listar.infiniteQueryOptions(
+      { limit: TAMANHO_PAGINA },
+      { getNextPageParam: (ultimaPagina) => ultimaPagina.proximoCursor },
+    ),
+  );
+  const tarefas = consulta.data?.pages.flatMap((pagina) => pagina.itens);
+
+  // Elemento "sentinela" no fim da lista: quando ele entra na tela, carrega a próxima página.
+  const sentinela = useRef<HTMLDivElement>(null);
+  const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } =
+    consulta;
+  useEffect(() => {
+    const elemento = sentinela.current;
+    // Após uma falha, não tenta sozinho (evitaria um laço de requisições):
+    // o usuário decide com o botão "Tentar novamente".
+    if (!elemento || !hasNextPage || isFetchingNextPage || isFetchNextPageError) return;
+    const observador = new IntersectionObserver(
+      ([entrada]) => {
+        if (entrada.isIntersecting) fetchNextPage();
+      },
+      { rootMargin: "200px" }, // começa a carregar um pouco antes de chegar ao fim
+    );
+    observador.observe(elemento);
+    return () => observador.disconnect();
+  }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
 
   const deletar = useMutation(
     trpc.tarefas.deletar.mutationOptions({
@@ -49,7 +76,7 @@ export function ListaTarefas({ salvo }: Props) {
       onError: (erro) => setFeedback({ tipo: "erro", texto: erro.message }),
       // Sucesso ou erro: recarrega a lista (o 404 indica que ela já estava desatualizada).
       onSettled: () =>
-        queryClient.invalidateQueries({ queryKey: trpc.tarefas.listar.queryKey() }),
+        queryClient.invalidateQueries({ queryKey: trpc.tarefas.listar.pathKey() }),
     }),
   );
 
@@ -88,21 +115,22 @@ export function ListaTarefas({ salvo }: Props) {
         </div>
       )}
 
-      {tarefas.isError && (
+      {/* Falha ao carregar a lista inicial (a de páginas seguintes é tratada abaixo). */}
+      {consulta.isError && !isFetchNextPageError && (
         <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-          Não foi possível carregar as tarefas: {tarefas.error.message}{" "}
-          <button className="underline" onClick={() => tarefas.refetch()}>
+          Não foi possível carregar as tarefas: {consulta.error.message}{" "}
+          <button className="underline" onClick={() => consulta.refetch()}>
             Tentar novamente
           </button>
         </div>
       )}
 
-      {tarefas.data?.length === 0 && (
+      {tarefas?.length === 0 && (
         <p className="text-sm text-gray-500">Nenhuma tarefa cadastrada ainda.</p>
       )}
 
       <ul className="space-y-2">
-        {tarefas.data?.map((tarefa) => {
+        {tarefas?.map((tarefa) => {
           const excluindo = deletar.isPending && deletar.variables?.id === tarefa.id;
           return (
             <li
@@ -139,6 +167,22 @@ export function ListaTarefas({ salvo }: Props) {
           );
         })}
       </ul>
+
+      {/* Rodapé do infinite scroll: sentinela + estados de carregamento/erro. */}
+      <div ref={sentinela} className="py-2 text-center text-sm text-gray-500">
+        {isFetchingNextPage && <p role="status">Carregando mais tarefas...</p>}
+        {isFetchNextPageError && (
+          <p role="alert" className="text-red-700">
+            Não foi possível carregar mais tarefas.{" "}
+            <button className="underline" onClick={() => fetchNextPage()}>
+              Tentar novamente
+            </button>
+          </p>
+        )}
+        {!hasNextPage && tarefas && tarefas.length > TAMANHO_PAGINA && (
+          <p>Todas as tarefas foram carregadas.</p>
+        )}
+      </div>
     </section>
   );
 }

@@ -33,7 +33,7 @@ export function FormularioTarefa({ tarefa }: Props) {
   // Criar e atualizar compartilham o mesmo fluxo de sucesso/erro.
   const opcoes = {
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: trpc.tarefas.listar.queryKey() });
+      await queryClient.invalidateQueries({ queryKey: trpc.tarefas.listar.pathKey() });
       // A listagem lê `?salvo=` para exibir a mensagem de sucesso.
       router.push(`/?salvo=${editando ? "atualizada" : "criada"}`);
     },

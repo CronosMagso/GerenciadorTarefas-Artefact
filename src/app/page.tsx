@@ -1,4 +1,5 @@
 import { ListaTarefas } from "@/components/lista-tarefas";
+import { TAMANHO_PAGINA } from "@/server/tarefas/limites";
 import { getQueryClient, HydrateClient, trpc } from "@/trpc/server";
 
 // As tarefas vivem em memória e mudam a cada requisição: a página precisa ser
@@ -13,9 +14,16 @@ export default async function Home({
 }) {
   const { salvo } = await searchParams;
 
-  // Busca no servidor e coloca no cache do React Query; `HydrateClient` envia
-  // esse cache ao navegador, e a lista já nasce no HTML, sem spinner inicial.
-  await getQueryClient().prefetchQuery(trpc.tarefas.listar.queryOptions());
+  // Busca só a PRIMEIRA página no servidor e a coloca no cache do React Query;
+  // `HydrateClient` envia esse cache ao navegador, e a lista já nasce no HTML,
+  // sem spinner inicial. As demais páginas vêm do infinite scroll no cliente.
+  // O input precisa ser idêntico ao do cliente para que a chave de cache bata.
+  await getQueryClient().prefetchInfiniteQuery(
+    trpc.tarefas.listar.infiniteQueryOptions(
+      { limit: TAMANHO_PAGINA },
+      { getNextPageParam: (ultimaPagina) => ultimaPagina.proximoCursor },
+    ),
+  );
 
   return (
     <main className="mx-auto max-w-2xl p-6">

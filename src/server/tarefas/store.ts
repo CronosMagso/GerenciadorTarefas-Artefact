@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Tarefa } from "./schema";
+import type { Cursor, Tarefa } from "./schema";
 
 /**
  * Armazenamento em memória (sem banco, conforme o enunciado).
@@ -13,12 +13,31 @@ import type { Tarefa } from "./schema";
 const globalParaStore = globalThis as unknown as { __tarefas?: Map<string, Tarefa> };
 const tarefas = (globalParaStore.__tarefas ??= new Map<string, Tarefa>());
 
+// Mais recentes primeiro; o id desempata tarefas criadas no mesmo milissegundo,
+// garantindo uma ordem total (necessária para o cursor).
+const ordem = (a: Cursor, b: Cursor) =>
+  b.dataCriacao.getTime() - a.dataCriacao.getTime() ||
+  (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
 export const tarefasStore = {
-  /** Mais recentes primeiro. */
-  listar(): Tarefa[] {
-    return [...tarefas.values()].sort(
-      (a, b) => b.dataCriacao.getTime() - a.dataCriacao.getTime(),
-    );
+  /**
+   * Uma página de tarefas, mais recentes primeiro. `proximoCursor` é
+   * `undefined` na última página.
+   */
+  listarPagina(limite: number, cursor?: Cursor) {
+    const ordenadas = [...tarefas.values()].sort(ordem);
+    // Só o que vem DEPOIS do cursor na ordenação. Como o cursor é uma posição,
+    // continua válido mesmo que o item que o originou tenha sido excluído.
+    const restantes = cursor
+      ? ordenadas.filter((tarefa) => ordem(tarefa, cursor) > 0)
+      : ordenadas;
+    const itens = restantes.slice(0, limite);
+    const ultimo = itens.at(-1);
+    const proximoCursor: Cursor | undefined =
+      ultimo && restantes.length > limite
+        ? { dataCriacao: ultimo.dataCriacao, id: ultimo.id }
+        : undefined;
+    return { itens, proximoCursor };
   },
 
   buscar(id: string): Tarefa | undefined {

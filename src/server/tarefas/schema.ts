@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { DESCRICAO_MAX, TITULO_MAX } from "./limites";
+import {
+  DESCRICAO_MAX,
+  LIMITE_MAXIMO_PAGINA,
+  TAMANHO_PAGINA,
+  TITULO_MAX,
+} from "./limites";
 
 /**
  * Entidade Tarefa. Os nomes dos campos seguem o enunciado (pt-BR).
@@ -40,4 +45,17 @@ export const atualizarTarefaInput = z.object({
 
 export const tarefaIdInput = z.object({
   id: z.string().min(1, "O id é obrigatório."),
+});
+
+/**
+ * Cursor da paginação: a posição (dataCriacao + id) do último item recebido.
+ * Guardar a posição, e não um número de página/offset, evita itens repetidos
+ * ou pulados quando alguém cria ou exclui tarefas entre uma página e outra.
+ */
+export const cursorSchema = z.object({ dataCriacao: z.date(), id: z.string() });
+export type Cursor = z.infer<typeof cursorSchema>;
+
+export const listarTarefasInput = z.object({
+  limit: z.number().int().min(1).max(LIMITE_MAXIMO_PAGINA).default(TAMANHO_PAGINA),
+  cursor: cursorSchema.nullish(),
 });
